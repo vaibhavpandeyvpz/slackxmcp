@@ -1,10 +1,10 @@
 {
-  "name": "slackmcp",
+  "name": "slackxmcp",
   "version": "0.1.0",
   "description": "TypeScript stdio MCP server and CLI for Slack Socket Mode apps.",
   "type": "module",
   "bin": {
-    "slackmcp": "./dist/index.js"
+    "slackxmcp": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "files": [
@@ -31,12 +31,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vaibhavpandeyvpz/slackmcp.git"
+    "url": "git+https://github.com/vaibhavpandeyvpz/slackxmcp.git"
   },
   "bugs": {
-    "url": "https://github.com/vaibhavpandeyvpz/slackmcp/issues"
+    "url": "https://github.com/vaibhavpandeyvpz/slackxmcp/issues"
   },
-  "homepage": "https://github.com/vaibhavpandeyvpz/slackmcp#readme",
+  "homepage": "https://github.com/vaibhavpandeyvpz/slackxmcp#readme",
   "publishConfig": {
     "access": "public"
   },

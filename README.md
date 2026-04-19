@@ -1,6 +1,6 @@
-# slackmcp
+# slackxmcp
 
-`slackmcp` is an open-source Slack stdio MCP server built on top of the official [`@slack/bolt`](https://www.npmjs.com/package/@slack/bolt), [`@slack/web-api`](https://www.npmjs.com/package/@slack/web-api), `commander`, and `@modelcontextprotocol/sdk`.
+`slackxmcp` is an open-source Slack stdio MCP server built on top of the official [`@slack/bolt`](https://www.npmjs.com/package/@slack/bolt), [`@slack/web-api`](https://www.npmjs.com/package/@slack/web-api), `commander`, and `@modelcontextprotocol/sdk`.
 
 It lets MCP-compatible clients interact with Slack through Web API tools and optionally subscribe to inbound Slack messages through a Socket Mode powered MCP notification channel.
 
@@ -50,7 +50,7 @@ Depending on your workspace policy and the conversations you target, Slack may r
 Use it without installing globally:
 
 ```bash
-npx slackmcp mcp
+npx slackxmcp mcp
 ```
 
 Or for local development:
@@ -80,13 +80,13 @@ export SLACK_APP_TOKEN="xapp-your-app-token"
 2. Start the MCP server:
 
 ```bash
-npx slackmcp mcp
+npx slackxmcp mcp
 ```
 
 3. If your MCP host supports notifications and you want inbound Slack events, provide a channel name:
 
 ```bash
-npx slackmcp mcp --channel claude/channel
+npx slackxmcp mcp --channel claude/channel
 ```
 
 The server uses stdio, so it is meant to be launched by an MCP client or wrapper rather than browsed directly in a terminal.
@@ -96,7 +96,7 @@ The server uses stdio, so it is meant to be launched by an MCP client or wrapper
 ### MCP Server
 
 ```bash
-npx slackmcp mcp
+npx slackxmcp mcp
 ```
 
 Starts the stdio MCP server for the configured Slack app.
@@ -150,4 +150,4 @@ Inbound notification messages ignore Slack bot/system message subtypes.
 - `slack_send_files` uses Slack's upload flow and accepts either a single `path` or `content`, or a `files` array for uploading multiple files in one call.
 - `slack_reply_to_message` expects a parent `threadTs`.
 - `slack_lookup_channel` resolves exact names and IDs; if you need history after a lookup, pass the resolved ID to the history tools.
-- The CLI intentionally exposes only `slackmcp mcp`.
+- The CLI intentionally exposes only `slackxmcp mcp`.

@@ -30,12 +30,12 @@ export class McpCommand implements CliCommand {
 
     if (!tokenConfig) {
       throw new Error(
-        `Set ${TOKEN_ENV_NAMES.join(" or ")} before starting slackmcp.`,
+        `Set ${TOKEN_ENV_NAMES.join(" or ")} before starting slackxmcp.`,
       );
     }
 
     if (!appToken) {
-      throw new Error(`Set ${APP_TOKEN_ENV_NAME} before starting slackmcp.`);
+      throw new Error(`Set ${APP_TOKEN_ENV_NAME} before starting slackxmcp.`);
     }
 
     const session = new SlackSession({
