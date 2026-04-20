@@ -20,16 +20,19 @@ export type Channel = {
   member_count?: number;
 };
 
+export type UserSearchResult = {
+  user_id: string;
+  username?: string;
+  real_name?: string;
+  display_name?: string;
+  email?: string;
+  title?: string;
+  dm_channel_id?: string;
+  type: "bot" | "user";
+};
+
 export type Connection = {
-  profile: {
-    env: string;
-    appEnv: string;
-  };
   status: "idle" | "starting" | "connected" | "disconnected";
-  device: {
-    library: "@slack/bolt";
-    mode: "socket_mode";
-  };
   self?: Entity;
 };
 
@@ -68,4 +71,9 @@ export type Message = {
   subtype?: string;
   attachments: SlackAttachment[];
   links: string[];
+};
+
+export type MessageSearchResult = Message & {
+  permalink?: string;
+  score?: number;
 };

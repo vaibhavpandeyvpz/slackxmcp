@@ -8,8 +8,10 @@ import type {
   Entity,
   LookupResult,
   Message,
+  MessageSearchResult,
   MessageReference,
   SlackAttachment,
+  UserSearchResult,
 } from "./types.js";
 
 type SessionEvents = {
@@ -21,15 +23,19 @@ type SlackUserLike = {
   name?: string;
   real_name?: string;
   is_bot?: boolean;
+  deleted?: boolean;
   profile?: {
     display_name?: string;
     real_name?: string;
+    email?: string;
+    title?: string;
   };
 };
 
 type SlackConversationLike = {
   id?: string;
   name?: string;
+  user?: string;
   is_channel?: boolean;
   is_group?: boolean;
   is_im?: boolean;
@@ -64,6 +70,31 @@ type SlackMessageLike = {
   files?: SlackFileLike[];
 };
 
+type SlackSearchMessageLike = {
+  subtype?: string;
+  user?: string;
+  text?: string;
+  ts?: string;
+  thread_ts?: string;
+  files?: SlackFileLike[];
+  permalink?: string;
+  score?: number;
+  channel?: SlackConversationLike;
+  username?: string;
+};
+
+type MessageSearchFilters = {
+  inChannel?: string;
+  inImOrMpim?: string;
+  usersWith?: string;
+  usersFrom?: string;
+  dateBefore?: string;
+  dateAfter?: string;
+  dateOn?: string;
+  dateDuring?: string;
+  threadsOnly?: boolean;
+};
+
 type SlackFileUploadArguments = Parameters<WebClient["filesUploadV2"]>[0];
 type SlackUploadInput = {
   path?: string;
@@ -89,6 +120,8 @@ export class SlackSession {
   private startPromise?: Promise<void>;
   private readonly channelCache = new Map<string, Channel>();
   private readonly userCache = new Map<string, Entity>();
+  private readonly dmChannelCache = new Map<string, string>();
+  private dmChannelCacheLoaded = false;
 
   constructor(options: {
     token: string;
@@ -171,15 +204,7 @@ export class SlackSession {
 
   async getStatus(): Promise<Connection> {
     return {
-      profile: {
-        env: this.tokenEnvName,
-        appEnv: APP_TOKEN_ENV_NAME,
-      },
       status: this.state,
-      device: {
-        library: "@slack/bolt",
-        mode: "socket_mode",
-      },
       self: this.self,
     };
   }
@@ -219,6 +244,39 @@ export class SlackSession {
     return members.filter((member): member is Entity => member != null);
   }
 
+  async listChannels(
+    channelTypes?: Array<"public_channel" | "private_channel" | "im" | "mpim">,
+    sort?: "popularity",
+    cursor?: string,
+    limit?: number,
+  ): Promise<object> {
+    const response = await this.webClient.conversations.list({
+      cursor,
+      limit,
+      types: channelTypes?.join(","),
+    });
+
+    const channels = (response.channels ?? []).map((conversation) => {
+      const channel = this.normalizeChannel(
+        conversation as SlackConversationLike,
+      );
+      this.channelCache.set(channel.id, channel);
+      return channel;
+    });
+
+    if (sort === "popularity") {
+      channels.sort(
+        (left, right) => (right.member_count ?? 0) - (left.member_count ?? 0),
+      );
+    }
+
+    return {
+      ok: response.ok ?? true,
+      next_cursor: response.response_metadata?.next_cursor,
+      channels,
+    };
+  }
+
   async lookupChannel(input: string): Promise<LookupResult> {
     const query = input.trim();
     const direct = await this.lookupConversationById(query);
@@ -250,7 +308,9 @@ export class SlackSession {
         );
       });
       if (match) {
-        const normalized = this.toChannel(match as SlackConversationLike);
+        const normalized = this.normalizeChannel(
+          match as SlackConversationLike,
+        );
         this.channelCache.set(normalized.id, normalized);
         return {
           q: query,
@@ -266,6 +326,98 @@ export class SlackSession {
     return {
       q: query,
       found: false,
+    };
+  }
+
+  async searchUsers(query?: string, limit?: number): Promise<object> {
+    const q = query?.trim();
+    if (!q) {
+      throw new Error("query is required for slack_search_users.");
+    }
+
+    const needle = q.toLowerCase();
+    const matches: Array<{ score: number; user: UserSearchResult }> = [];
+    let cursor: string | undefined;
+
+    await this.loadDmChannelCache();
+
+    do {
+      const response = await this.webClient.users.list({
+        cursor,
+        limit: 200,
+      });
+
+      for (const user of response.members ?? []) {
+        const candidate = this.toUserSearchResult(user as SlackUserLike);
+        if (!candidate) {
+          continue;
+        }
+
+        const score = this.rankUserSearchMatch(candidate, needle);
+        if (score <= 0) {
+          continue;
+        }
+
+        matches.push({ score, user: candidate });
+      }
+
+      cursor = response.response_metadata?.next_cursor || undefined;
+    } while (cursor);
+
+    matches.sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return left.user.user_id.localeCompare(right.user.user_id);
+    });
+
+    const resultLimit = limit ?? 10;
+    return {
+      ok: true,
+      users: matches.slice(0, resultLimit).map((match) => match.user),
+      total: matches.length,
+    };
+  }
+
+  async searchMessages(
+    searchQuery?: string,
+    filters?: MessageSearchFilters,
+    cursor?: string,
+    limit?: number,
+  ): Promise<object> {
+    if (this.inferTokenEntityType() === "bot") {
+      throw new Error(
+        "slack_search_messages is not available for bot tokens. Use SLACK_USER_TOKEN with search:read instead.",
+      );
+    }
+
+    const page = this.parseSearchPage(cursor);
+    const query = await this.buildMessageSearchQuery(searchQuery, filters);
+    const response = await this.webClient.search.messages({
+      query,
+      page,
+      count: limit ?? 20,
+      highlight: false,
+    });
+
+    const paging = response.messages?.paging;
+    const pageCount =
+      typeof paging?.page === "number" &&
+      typeof paging?.pages === "number" &&
+      paging.page < paging.pages
+        ? String(paging.page + 1)
+        : undefined;
+    const matches = (response.messages?.matches ??
+      []) as SlackSearchMessageLike[];
+
+    return {
+      ok: response.ok ?? true,
+      query,
+      total: response.messages?.total ?? matches.length,
+      next_cursor: pageCount,
+      messages: await Promise.all(
+        matches.map(async (match) => this.normalizeSearchMessage(match)),
+      ),
     };
   }
 
@@ -386,7 +538,7 @@ export class SlackSession {
       channel_id: input.channelId,
       thread_ts: input.threadTs,
       files: ((response.files ?? []) as SlackFileLike[]).map((file) =>
-        this.toAttachment(file),
+        this.normalizeAttachment(file),
       ),
     };
   }
@@ -505,7 +657,9 @@ export class SlackSession {
         return undefined;
       }
 
-      const channel = this.toChannel(response.channel as SlackConversationLike);
+      const channel = this.normalizeChannel(
+        response.channel as SlackConversationLike,
+      );
       this.channelCache.set(channel.id, channel);
       return channel;
     } catch {
@@ -528,7 +682,7 @@ export class SlackSession {
         return undefined;
       }
 
-      const entity = this.toEntity(response.user as SlackUserLike, asBot);
+      const entity = this.normalizeUser(response.user as SlackUserLike, asBot);
       this.userCache.set(entity.id, entity);
       return entity;
     } catch {
@@ -541,7 +695,284 @@ export class SlackSession {
     }
   }
 
-  private toEntity(user: SlackUserLike, asBot: boolean): Entity {
+  private async loadDmChannelCache(): Promise<void> {
+    if (this.dmChannelCacheLoaded) {
+      return;
+    }
+
+    let cursor: string | undefined;
+    do {
+      const response = await this.webClient.conversations.list({
+        cursor,
+        limit: 200,
+        types: "im",
+      });
+
+      for (const conversation of response.channels ?? []) {
+        const userId = (conversation as SlackConversationLike).user?.trim();
+        const channelId = (conversation as SlackConversationLike).id?.trim();
+        if (userId && channelId) {
+          this.dmChannelCache.set(userId, channelId);
+        }
+      }
+
+      cursor = response.response_metadata?.next_cursor || undefined;
+    } while (cursor);
+
+    this.dmChannelCacheLoaded = true;
+  }
+
+  private toUserSearchResult(
+    user: SlackUserLike,
+  ): UserSearchResult | undefined {
+    if (user.deleted || !user.id?.trim()) {
+      return undefined;
+    }
+
+    const username =
+      typeof user.name === "string" && user.name.trim()
+        ? user.name.trim()
+        : undefined;
+    const realName =
+      typeof user.real_name === "string" && user.real_name.trim()
+        ? user.real_name.trim()
+        : typeof user.profile?.real_name === "string" &&
+            user.profile.real_name.trim()
+          ? user.profile.real_name.trim()
+          : undefined;
+    const displayName =
+      typeof user.profile?.display_name === "string" &&
+      user.profile.display_name.trim()
+        ? user.profile.display_name.trim()
+        : undefined;
+    const email =
+      typeof user.profile?.email === "string" && user.profile.email.trim()
+        ? user.profile.email.trim()
+        : undefined;
+    const title =
+      typeof user.profile?.title === "string" && user.profile.title.trim()
+        ? user.profile.title.trim()
+        : undefined;
+
+    return {
+      user_id: user.id.trim(),
+      username,
+      real_name: realName,
+      display_name: displayName,
+      email,
+      title,
+      dm_channel_id: this.dmChannelCache.get(user.id.trim()),
+      type: user.is_bot ? "bot" : "user",
+    };
+  }
+
+  private rankUserSearchMatch(
+    candidate: UserSearchResult,
+    needle: string,
+  ): number {
+    const values = [
+      candidate.user_id,
+      candidate.username,
+      candidate.real_name,
+      candidate.display_name,
+      candidate.email,
+    ].filter((value): value is string => Boolean(value));
+
+    let bestScore = 0;
+    for (const value of values) {
+      const haystack = value.toLowerCase();
+      if (haystack === needle) {
+        bestScore = Math.max(bestScore, 100);
+      } else if (haystack.startsWith(needle)) {
+        bestScore = Math.max(bestScore, 75);
+      } else if (haystack.includes(needle)) {
+        bestScore = Math.max(bestScore, 50);
+      }
+    }
+
+    return bestScore;
+  }
+
+  private parseSearchPage(cursor?: string): number {
+    if (!cursor?.trim()) {
+      return 1;
+    }
+
+    const page = Number.parseInt(cursor, 10);
+    if (!Number.isFinite(page) || page < 1) {
+      throw new Error(
+        `Invalid cursor "${cursor}". Expected a positive page number.`,
+      );
+    }
+
+    return page;
+  }
+
+  private async buildMessageSearchQuery(
+    searchQuery?: string,
+    filters?: MessageSearchFilters,
+  ): Promise<string> {
+    const terms = [searchQuery?.trim()].filter((value): value is string =>
+      Boolean(value),
+    );
+
+    const channelTerm = await this.resolveChannelSearchTerm(filters?.inChannel);
+    if (channelTerm) {
+      terms.push(`in:${channelTerm}`);
+    }
+
+    const dmOrMpimTerm = await this.resolveDmOrMpimSearchTerm(
+      filters?.inImOrMpim,
+    );
+    if (dmOrMpimTerm) {
+      terms.push(`in:${dmOrMpimTerm}`);
+    }
+
+    const withUser = await this.resolveUserSearchTerm(filters?.usersWith);
+    if (withUser) {
+      terms.push(`with:${withUser}`);
+    }
+
+    const fromUser = await this.resolveUserSearchTerm(filters?.usersFrom);
+    if (fromUser) {
+      terms.push(`from:${fromUser}`);
+    }
+
+    if (filters?.dateBefore?.trim()) {
+      terms.push(`before:${filters.dateBefore.trim()}`);
+    }
+    if (filters?.dateAfter?.trim()) {
+      terms.push(`after:${filters.dateAfter.trim()}`);
+    }
+    if (filters?.dateOn?.trim()) {
+      terms.push(`on:${filters.dateOn.trim()}`);
+    }
+    if (filters?.dateDuring?.trim()) {
+      terms.push(`during:${filters.dateDuring.trim()}`);
+    }
+    if (filters?.threadsOnly) {
+      terms.push("is:thread");
+    }
+
+    if (terms.length === 0) {
+      throw new Error(
+        "Provide at least one search term or filter for slack_search_messages.",
+      );
+    }
+
+    return terms.join(" ");
+  }
+
+  private async resolveChannelSearchTerm(
+    input?: string,
+  ): Promise<string | undefined> {
+    const value = input?.trim();
+    if (!value) {
+      return undefined;
+    }
+
+    const channel = await this.lookupConversationById(value);
+    if (channel?.name) {
+      return channel.type === "channel" ? `#${channel.name}` : channel.name;
+    }
+
+    return value.startsWith("#") ? value : `#${value}`;
+  }
+
+  private async resolveDmOrMpimSearchTerm(
+    input?: string,
+  ): Promise<string | undefined> {
+    const value = input?.trim();
+    if (!value) {
+      return undefined;
+    }
+
+    const conversation = await this.lookupConversationById(value);
+    if (!conversation) {
+      return value;
+    }
+
+    if (conversation.type === "im") {
+      await this.loadDmChannelCache();
+      const userId = [...this.dmChannelCache.entries()].find(
+        ([, channelId]) => channelId === conversation.id,
+      )?.[0];
+      if (!userId) {
+        return value;
+      }
+
+      const user = await this.lookupUserEntity(userId, false);
+      return user?.username ? `@${user.username}` : value;
+    }
+
+    return conversation.name ?? value;
+  }
+
+  private async resolveUserSearchTerm(
+    input?: string,
+  ): Promise<string | undefined> {
+    const value = input?.trim();
+    if (!value) {
+      return undefined;
+    }
+
+    const looksLikeUserId = /^[UW][A-Z0-9]+$/i.test(value);
+    if (looksLikeUserId) {
+      const user = await this.lookupUserEntity(value, false);
+      if (user?.username) {
+        return `@${user.username}`;
+      }
+    }
+
+    return value.startsWith("@") ? value : `@${value}`;
+  }
+
+  private async normalizeSearchMessage(
+    message: SlackSearchMessageLike,
+  ): Promise<MessageSearchResult> {
+    const rawChannel = message.channel;
+    const channelId = rawChannel?.id?.trim() || "unknown";
+    const channel =
+      rawChannel != null
+        ? this.normalizeChannel(rawChannel)
+        : ((await this.lookupConversationById(channelId)) ??
+          ({
+            id: channelId,
+            type: "unknown",
+            flags: {
+              private: false,
+              dm: false,
+              mpim: false,
+              archived: false,
+            },
+          } as Channel));
+    this.channelCache.set(channel.id, channel);
+
+    const sender =
+      typeof message.user === "string" && message.user.trim()
+        ? await this.lookupUserEntity(message.user.trim(), false)
+        : undefined;
+    const text = message.text ?? "";
+
+    return {
+      id: `${channel.id}:${message.ts ?? "unknown"}`,
+      ts: message.ts ?? "",
+      thread_ts: message.thread_ts,
+      text,
+      channel,
+      sender,
+      timestamp: this.timestampFromSlackTs(message.ts),
+      subtype: message.subtype,
+      attachments: (message.files ?? []).map((file) =>
+        this.normalizeAttachment(file),
+      ),
+      links: this.extractLinks(text),
+      permalink: message.permalink,
+      score: message.score,
+    };
+  }
+
+  private normalizeUser(user: SlackUserLike, asBot: boolean): Entity {
     const username =
       typeof user.name === "string" && user.name.trim()
         ? user.name.trim()
@@ -567,7 +998,7 @@ export class SlackSession {
     };
   }
 
-  private toChannel(conversation: SlackConversationLike): Channel {
+  private normalizeChannel(conversation: SlackConversationLike): Channel {
     return {
       id: conversation.id?.trim() || "unknown",
       name:
@@ -629,7 +1060,7 @@ export class SlackSession {
           ? await this.getMe()
           : undefined;
     const attachments = (event.files ?? []).map((file) =>
-      this.toAttachment(file),
+      this.normalizeAttachment(file),
     );
 
     return {
@@ -646,7 +1077,7 @@ export class SlackSession {
     };
   }
 
-  private toAttachment(file: SlackFileLike): SlackAttachment {
+  private normalizeAttachment(file: SlackFileLike): SlackAttachment {
     return {
       id: file.id,
       name: file.name,

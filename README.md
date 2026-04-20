@@ -45,6 +45,8 @@ At minimum, configure:
 
 Depending on your workspace policy and the conversations you target, Slack may require additional scopes.
 
+If you want to use `slack_search_messages`, you will typically also need a user token with `search:read` because Slack does not expose message search through bot tokens.
+
 ## Installation
 
 Use it without installing globally:
@@ -109,6 +111,9 @@ The server currently exposes these tools:
 - `slack_get_status`
 - `slack_get_channel`
 - `slack_get_channel_members`
+- `slack_list_channels`
+- `slack_search_users`
+- `slack_search_messages`
 - `slack_lookup_channel`
 - `slack_get_channel_history`
 - `slack_get_thread_replies`
@@ -144,10 +149,6 @@ The JSON-decoded `content` payload includes:
 
 Inbound notification messages ignore Slack bot/system message subtypes.
 
-## Notes
+## License
 
-- Slack message mutation tools target explicit `channelId` and `timestamp` values.
-- `slack_send_files` uses Slack's upload flow and accepts either a single `path` or `content`, or a `files` array for uploading multiple files in one call.
-- `slack_reply_to_message` expects a parent `threadTs`.
-- `slack_lookup_channel` resolves exact names and IDs; if you need history after a lookup, pass the resolved ID to the history tools.
-- The CLI intentionally exposes only `slackxmcp mcp`.
+See [LICENSE](LICENSE) file.

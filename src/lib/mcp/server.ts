@@ -120,6 +120,169 @@ export class SlackMcpServer {
     );
 
     this.mcp.registerTool(
+      "slack_list_channels",
+      {
+        title: "List Slack conversations",
+        description:
+          "List Slack conversations with optional type, sort, and pagination filters.",
+        inputSchema: z.object({
+          filters: z
+            .object({
+              channel_types: z
+                .array(
+                  z.enum(["public_channel", "private_channel", "im", "mpim"]),
+                )
+                .optional()
+                .describe(
+                  "Optional Slack conversation types to include in the result set.",
+                ),
+              sort: z
+                .enum(["popularity"])
+                .optional()
+                .describe(
+                  "Optional sort mode. popularity sorts by member count descending.",
+                ),
+              limit: z.number().int().min(1).max(999).optional(),
+              cursor: z.string().optional(),
+            })
+            .optional(),
+        }),
+      },
+      async ({ filters }) =>
+        createJsonResult(
+          await this.session.listChannels(
+            filters?.channel_types,
+            filters?.sort,
+            filters?.cursor,
+            filters?.limit,
+          ),
+        ),
+    );
+
+    this.mcp.registerTool(
+      "slack_search_users",
+      {
+        title: "Search Slack users",
+        description:
+          "Search Slack users by user ID, username, real name, display name, or email.",
+        inputSchema: z.object({
+          filters: z
+            .object({
+              query: z
+                .string()
+                .min(1)
+                .describe("Search text to match against users."),
+              limit: z.number().int().min(1).max(100).optional(),
+            })
+            .optional(),
+        }),
+      },
+      async ({ filters }) =>
+        createJsonResult(
+          await this.session.searchUsers(filters?.query, filters?.limit),
+        ),
+    );
+
+    this.mcp.registerTool(
+      "slack_search_messages",
+      {
+        title: "Search Slack messages",
+        description:
+          "Search Slack messages using a free-text query plus optional channel, user, date, and thread filters. This tool requires a user token rather than a bot token.",
+        inputSchema: z.object({
+          query: z
+            .string()
+            .optional()
+            .describe("Optional free-text search query or Slack message URL."),
+          filters: z
+            .object({
+              in_channel: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional public or private channel ID or name to constrain the search.",
+                ),
+              in_im_or_mpim: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional DM or MPIM conversation ID or name to constrain the search.",
+                ),
+              users_with: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional user ID or username to constrain results to messages involving that user.",
+                ),
+              users_from: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional user ID or username to constrain results to messages sent by that user.",
+                ),
+              date_before: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional upper-bound date filter, for example 2023-10-01.",
+                ),
+              date_after: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional lower-bound date filter, for example 2023-10-01.",
+                ),
+              date_on: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional exact date filter, for example 2023-10-01.",
+                ),
+              date_during: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional relative date filter, for example July or Today.",
+                ),
+              threads_only: z
+                .boolean()
+                .optional()
+                .describe("If true, only thread messages are returned."),
+            })
+            .optional(),
+          cursor: z
+            .string()
+            .optional()
+            .describe(
+              "Optional page cursor returned as next_cursor by the prior result.",
+            ),
+          limit: z.number().int().min(1).max(100).optional(),
+        }),
+      },
+      async ({ query, filters, cursor, limit }) =>
+        createJsonResult(
+          await this.session.searchMessages(
+            query,
+            filters
+              ? {
+                  inChannel: filters.in_channel,
+                  inImOrMpim: filters.in_im_or_mpim,
+                  usersWith: filters.users_with,
+                  usersFrom: filters.users_from,
+                  dateBefore: filters.date_before,
+                  dateAfter: filters.date_after,
+                  dateOn: filters.date_on,
+                  dateDuring: filters.date_during,
+                  threadsOnly: filters.threads_only,
+                }
+              : undefined,
+            cursor,
+            limit,
+          ),
+        ),
+    );
+
+    this.mcp.registerTool(
       "slack_lookup_channel",
       {
         title: "Lookup Slack conversation",

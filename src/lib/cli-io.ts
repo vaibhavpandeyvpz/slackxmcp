@@ -16,8 +16,6 @@ export class CliIO {
   }
 
   info(info: Connection): void {
-    this.line(`Slack token env: ${info.profile.env}`);
-    this.line(`App token env: ${info.profile.appEnv}`);
     this.line(`Connection status: ${info.status}`);
     if (info.self?.username) {
       this.line(`Slack username: @${info.self.username}`);
