@@ -112,9 +112,8 @@ The server currently exposes these tools:
 - `slack_get_channel`
 - `slack_get_channel_members`
 - `slack_list_channels`
-- `slack_search_users`
+- `slack_list_users`
 - `slack_search_messages`
-- `slack_lookup_channel`
 - `slack_get_channel_history`
 - `slack_get_thread_replies`
 - `slack_send_message`

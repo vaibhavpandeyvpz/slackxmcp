@@ -26,4 +26,4 @@ Keep formatting simple and Slack-compatible:
 - Prefer replying in an existing thread when the user is already working from a Slack thread.
 - Slack reactions use names like `thumbsup` or `eyes`, not `:thumbsup:`.
 - Slack timestamps are opaque string IDs such as `1745000000.123456`; preserve them exactly.
-- Use `slack_lookup_channel` or `slack_get_channel` before mutating a conversation when the destination is ambiguous.
+- Use `slack_get_channel` before mutating a conversation when the destination is ambiguous.

@@ -160,26 +160,22 @@ export class SlackMcpServer {
     );
 
     this.mcp.registerTool(
-      "slack_search_users",
+      "slack_list_users",
       {
-        title: "Search Slack users",
-        description:
-          "Search Slack users by user ID, username, real name, display name, or email.",
+        title: "List Slack users",
+        description: "List Slack users with optional pagination filters.",
         inputSchema: z.object({
           filters: z
             .object({
-              query: z
-                .string()
-                .min(1)
-                .describe("Search text to match against users."),
-              limit: z.number().int().min(1).max(100).optional(),
+              limit: z.number().int().min(1).max(999).optional(),
+              cursor: z.string().optional(),
             })
             .optional(),
         }),
       },
       async ({ filters }) =>
         createJsonResult(
-          await this.session.searchUsers(filters?.query, filters?.limit),
+          await this.session.listUsers(filters?.cursor, filters?.limit),
         ),
     );
 
@@ -280,20 +276,6 @@ export class SlackMcpServer {
             limit,
           ),
         ),
-    );
-
-    this.mcp.registerTool(
-      "slack_lookup_channel",
-      {
-        title: "Lookup Slack conversation",
-        description:
-          "Resolve a Slack conversation by ID or exact name. Names may be provided with or without a leading #.",
-        inputSchema: z.object({
-          channel: z.string().describe("Slack conversation ID or exact name."),
-        }),
-      },
-      async ({ channel }) =>
-        createJsonResult(await this.session.lookupChannel(channel)),
     );
 
     this.mcp.registerTool(

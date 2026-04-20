@@ -20,7 +20,7 @@ export type Channel = {
   member_count?: number;
 };
 
-export type UserSearchResult = {
+export type UserProfile = {
   user_id: string;
   username?: string;
   real_name?: string;
@@ -34,14 +34,6 @@ export type UserSearchResult = {
 export type Connection = {
   status: "idle" | "starting" | "connected" | "disconnected";
   self?: Entity;
-};
-
-export type LookupResult = {
-  q: string;
-  id?: string;
-  name?: string;
-  type?: Channel["type"];
-  found: boolean;
 };
 
 export type MessageReference = {

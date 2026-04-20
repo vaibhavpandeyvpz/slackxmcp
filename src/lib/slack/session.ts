@@ -6,12 +6,11 @@ import type {
   Channel,
   Connection,
   Entity,
-  LookupResult,
   Message,
   MessageSearchResult,
   MessageReference,
   SlackAttachment,
-  UserSearchResult,
+  UserProfile,
 } from "./types.js";
 
 type SessionEvents = {
@@ -104,8 +103,6 @@ type SlackUploadInput = {
   altText?: string;
   snippetType?: string;
 };
-
-const APP_TOKEN_ENV_NAME = "SLACK_APP_TOKEN";
 
 export class SlackSession {
   private readonly io: CliIO;
@@ -277,105 +274,20 @@ export class SlackSession {
     };
   }
 
-  async lookupChannel(input: string): Promise<LookupResult> {
-    const query = input.trim();
-    const direct = await this.lookupConversationById(query);
-    if (direct) {
-      return {
-        q: query,
-        id: direct.id,
-        name: direct.name,
-        type: direct.type,
-        found: true,
-      };
-    }
-
-    const needle = query.replace(/^#/, "").toLowerCase();
-    let cursor: string | undefined;
-
-    do {
-      const response = await this.webClient.conversations.list({
-        cursor,
-        limit: 200,
-        types: "public_channel,private_channel,mpim,im",
-        exclude_archived: true,
-      });
-      const match = (response.channels ?? []).find((channel) => {
-        return (
-          typeof channel.id === "string" &&
-          typeof channel.name === "string" &&
-          channel.name.toLowerCase() === needle
-        );
-      });
-      if (match) {
-        const normalized = this.normalizeChannel(
-          match as SlackConversationLike,
-        );
-        this.channelCache.set(normalized.id, normalized);
-        return {
-          q: query,
-          id: normalized.id,
-          name: normalized.name,
-          type: normalized.type,
-          found: true,
-        };
-      }
-      cursor = response.response_metadata?.next_cursor || undefined;
-    } while (cursor);
-
-    return {
-      q: query,
-      found: false,
-    };
-  }
-
-  async searchUsers(query?: string, limit?: number): Promise<object> {
-    const q = query?.trim();
-    if (!q) {
-      throw new Error("query is required for slack_search_users.");
-    }
-
-    const needle = q.toLowerCase();
-    const matches: Array<{ score: number; user: UserSearchResult }> = [];
-    let cursor: string | undefined;
-
+  async listUsers(cursor?: string, limit?: number): Promise<object> {
     await this.loadDmChannelCache();
 
-    do {
-      const response = await this.webClient.users.list({
-        cursor,
-        limit: 200,
-      });
-
-      for (const user of response.members ?? []) {
-        const candidate = this.toUserSearchResult(user as SlackUserLike);
-        if (!candidate) {
-          continue;
-        }
-
-        const score = this.rankUserSearchMatch(candidate, needle);
-        if (score <= 0) {
-          continue;
-        }
-
-        matches.push({ score, user: candidate });
-      }
-
-      cursor = response.response_metadata?.next_cursor || undefined;
-    } while (cursor);
-
-    matches.sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return left.user.user_id.localeCompare(right.user.user_id);
+    const response = await this.webClient.users.list({
+      cursor,
+      limit,
     });
 
-    const resultLimit = limit ?? 10;
     return {
-      ok: true,
-      users: matches.slice(0, resultLimit).map((match) => match.user),
-      total: matches.length,
+      ok: response.ok ?? true,
+      next_cursor: response.response_metadata?.next_cursor,
+      users: (response.members ?? [])
+        .map((user) => this.normalizeUserProfile(user as SlackUserLike))
+        .filter((user): user is UserProfile => user != null),
     };
   }
 
@@ -722,9 +634,7 @@ export class SlackSession {
     this.dmChannelCacheLoaded = true;
   }
 
-  private toUserSearchResult(
-    user: SlackUserLike,
-  ): UserSearchResult | undefined {
+  private normalizeUserProfile(user: SlackUserLike): UserProfile | undefined {
     if (user.deleted || !user.id?.trim()) {
       return undefined;
     }
@@ -764,33 +674,6 @@ export class SlackSession {
       dm_channel_id: this.dmChannelCache.get(user.id.trim()),
       type: user.is_bot ? "bot" : "user",
     };
-  }
-
-  private rankUserSearchMatch(
-    candidate: UserSearchResult,
-    needle: string,
-  ): number {
-    const values = [
-      candidate.user_id,
-      candidate.username,
-      candidate.real_name,
-      candidate.display_name,
-      candidate.email,
-    ].filter((value): value is string => Boolean(value));
-
-    let bestScore = 0;
-    for (const value of values) {
-      const haystack = value.toLowerCase();
-      if (haystack === needle) {
-        bestScore = Math.max(bestScore, 100);
-      } else if (haystack.startsWith(needle)) {
-        bestScore = Math.max(bestScore, 75);
-      } else if (haystack.includes(needle)) {
-        bestScore = Math.max(bestScore, 50);
-      }
-    }
-
-    return bestScore;
   }
 
   private parseSearchPage(cursor?: string): number {
