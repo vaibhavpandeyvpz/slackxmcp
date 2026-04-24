@@ -626,7 +626,7 @@ export class SlackMcpServer {
         }
         const threadTs = params.meta?.thread?.trim();
         const text = [
-          `Hooman wants to run ${params.tool_name}.`,
+          `I want to run ${params.tool_name}.`,
           `Description: ${params.description}`,
           `Input: ${params.input_preview}`,
           "",
