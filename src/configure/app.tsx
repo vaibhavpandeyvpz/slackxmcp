@@ -244,7 +244,9 @@ export function ConfigureApp({
         title="Allowed Users"
         description="Toggle users for inbound event allowlist."
         items={items}
-        footerHint="enter: toggle/select | esc: back | ctrl+c: exit"
+        searchable
+        pageSize={5}
+        footerHint="type: search | enter: toggle/select | esc: back | ctrl+c: exit"
       />
     );
   };
@@ -280,7 +282,9 @@ export function ConfigureApp({
         title="Allowed Channels"
         description="Toggle channels for inbound event allowlist."
         items={items}
-        footerHint="enter: toggle/select | esc: back | ctrl+c: exit"
+        searchable
+        pageSize={5}
+        footerHint="type: search | enter: toggle/select | esc: back | ctrl+c: exit"
       />
     );
   };

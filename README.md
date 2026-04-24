@@ -117,6 +117,8 @@ Then opens an interactive configure UI (Ink) to manage:
 
 Allowlist items are toggled from menu screens (select an entry to toggle it, then choose `Back`).
 
+Allowed users/channels screens support live type-to-filter search with a 5-row scroll viewport for faster selection in large workspaces.
+
 Everything is persisted to:
 
 ```text
