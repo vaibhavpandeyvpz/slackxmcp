@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { App } from "@slack/bolt";
 import { WebClient } from "@slack/web-api";
+import type { KnownBlock } from "@slack/types";
 import { CliIO } from "../cli-io.js";
 import type {
   Channel,
@@ -428,35 +429,37 @@ export class SlackSession {
     options: ChannelPermissionOption[],
     threadTs?: string,
   ): Promise<MessageReference> {
+    const blocks: KnownBlock[] = [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text,
+        },
+      },
+      {
+        type: "actions",
+        elements: options.map((option) => ({
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: option.label,
+            emoji: true,
+          },
+          action_id: `hooman_approval_select:${option.id}`,
+          value: JSON.stringify({
+            requestId,
+            optionId: option.id,
+          }),
+        })),
+      },
+    ];
+
     const response = await this.webClient.chat.postMessage({
       channel: channelId,
       text,
       thread_ts: threadTs,
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text,
-          },
-        },
-        {
-          type: "actions",
-          elements: options.map((option) => ({
-            type: "button",
-            text: {
-              type: "plain_text",
-              text: option.label,
-              emoji: true,
-            },
-            action_id: "hooman_approval_select",
-            value: JSON.stringify({
-              requestId,
-              optionId: option.id,
-            }),
-          })),
-        },
-      ],
+      blocks,
     } as never);
 
     return {
@@ -566,7 +569,7 @@ export class SlackSession {
       app.event("message", async ({ event }) => {
         await this.handleIncomingMessage(event as SlackMessageLike);
       });
-      app.action("hooman_approval_select", async ({ ack, body }) => {
+      app.action(/^hooman_approval_select(?:$|:)/, async ({ ack, body }) => {
         await ack();
         const payload = body as {
           actions?: Array<{ value?: unknown }>;

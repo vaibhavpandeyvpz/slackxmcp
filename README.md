@@ -180,9 +180,7 @@ The JSON-decoded `content` payload includes:
 
 Inbound notification messages ignore Slack bot/system message subtypes.
 
-When Hooman sends `notifications/hooman/channel/permission_request`, `slackxmcp` posts the request back into the originating Slack conversation/thread with interactive buttons derived from `params.options` (defaults: allow once, always allow, deny). Button selections are relayed back over `notifications/hooman/channel/permission`.
-
-Approvals are handled through interactive buttons rendered from the permission request options.
+When Hooman sends `notifications/hooman/channel/permission_request`, `slackxmcp` posts the request back into the originating Slack conversation/thread with **Block Kit action buttons** derived from `params.options` (defaults: allow once, always allow, deny). Tapping a button is relayed back over `notifications/hooman/channel/permission`. There is no text-command approval path; the Slack app must have **Interactivity** enabled so Bolt can receive `block_actions` over Socket Mode.
 
 ## License
 

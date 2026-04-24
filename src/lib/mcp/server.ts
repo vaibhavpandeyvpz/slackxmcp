@@ -637,8 +637,7 @@ export class SlackMcpServer {
           `Description: ${params.description}`,
           `Input: ${params.input_preview}`,
           "",
-          "Choose an approval option below, or reply with text:",
-          `"yes ${params.request_id}", "always ${params.request_id}", or "no ${params.request_id}".`,
+          "Choose an approval option using the buttons below.",
         ].join("\n");
         await this.session.sendPermissionRequest(
           channelId,
