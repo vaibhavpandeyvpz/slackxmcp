@@ -2,6 +2,9 @@ import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import type { Entity, Message } from "./types.js";
 import type { SlackSession } from "./session.js";
 
+const PERMISSION_REPLY_RE =
+  /^\s*(yes|y|always|a|no|n)\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*$/i;
+
 export interface MessageChannelEvent {
   source: "slack";
   self: Entity;
@@ -42,6 +45,18 @@ export class SlackChannel {
 
   private async publish(message: Message): Promise<void> {
     try {
+      const verdict = parsePermissionVerdict(message.text);
+      if (verdict) {
+        await this.mcp.notification({
+          method: "notifications/hooman/channel/permission",
+          params: {
+            request_id: verdict.requestId,
+            behavior: verdict.behavior,
+          },
+        } as never);
+        return;
+      }
+
       this.self ??= await this.session.getMe();
       const event: MessageChannelEvent = {
         source: "slack",
@@ -58,6 +73,7 @@ export class SlackChannel {
             source: "slack",
             user: event.message.sender?.id,
             session: event.message.channel.id,
+            thread: event.message.thread_ts ?? event.message.ts,
           },
         },
       } as never);
@@ -65,4 +81,23 @@ export class SlackChannel {
       // Ignore closed transport or unsupported client errors.
     }
   }
+}
+
+function parsePermissionVerdict(text: string): {
+  requestId: string;
+  behavior: "allow_once" | "allow_always" | "deny";
+} | null {
+  const match = PERMISSION_REPLY_RE.exec(text);
+  if (!match) {
+    return null;
+  }
+  const command = match[1]!.toLowerCase();
+  const requestId = match[2]!.toLowerCase();
+  if (command === "yes" || command === "y") {
+    return { requestId, behavior: "allow_once" };
+  }
+  if (command === "always" || command === "a") {
+    return { requestId, behavior: "allow_always" };
+  }
+  return { requestId, behavior: "deny" };
 }

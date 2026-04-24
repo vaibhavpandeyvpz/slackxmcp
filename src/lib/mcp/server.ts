@@ -9,6 +9,11 @@ import { SlackChannel } from "../slack/channel.js";
 import type { SlackSession } from "../slack/session.js";
 import { createJsonResult } from "./helpers.js";
 
+const HOOMAN_CHANNEL = "hooman/channel";
+const HOOMAN_CHANNEL_PERMISSION = "hooman/channel/permission";
+const HOOMAN_PERMISSION_REQUEST_METHOD =
+  "notifications/hooman/channel/permission_request";
+
 function instructions(channel = false): string {
   const files = ["formatting.md", channel ? "channel.md" : null].filter(
     Boolean,
@@ -25,7 +30,7 @@ export class SlackMcpServer {
 
   private constructor(
     private readonly session: SlackSession,
-    private readonly channel?: string,
+    private readonly channels: boolean,
   ) {
     this.mcp = new McpServer(
       {
@@ -34,21 +39,26 @@ export class SlackMcpServer {
       },
       {
         capabilities: {
-          experimental: channel
+          experimental: channels
             ? {
-                "identity/user": { path: "meta.user" },
-                "identity/session": { path: "meta.session" },
-                [channel]: {},
+                "hooman/user": { path: "meta.user" },
+                "hooman/session": { path: "meta.session" },
+                "hooman/thread": { path: "meta.thread" },
+                [HOOMAN_CHANNEL]: {},
+                [HOOMAN_CHANNEL_PERMISSION]: {},
               }
             : undefined,
         },
-        instructions: instructions(Boolean(channel)),
+        instructions: instructions(channels),
       },
     );
+    if (channels) {
+      this.registerPermissionRelay();
+    }
   }
 
-  static create(session: SlackSession, channel?: string): SlackMcpServer {
-    const server = new SlackMcpServer(session, channel);
+  static create(session: SlackSession, channels: boolean): SlackMcpServer {
+    const server = new SlackMcpServer(session, channels);
     server.registerTools();
     return server;
   }
@@ -58,14 +68,14 @@ export class SlackMcpServer {
   }
 
   async subscribe(): Promise<void> {
-    if (!this.channel) {
-      throw new Error("Channel not specified");
+    if (!this.channels) {
+      throw new Error("Channels are not enabled");
     }
 
     const channel = new SlackChannel(
       this.session,
       this.mcp.server,
-      this.channel,
+      HOOMAN_CHANNEL,
     );
     await channel.start();
   }
@@ -570,6 +580,44 @@ export class SlackMcpServer {
       async ({ channelId, timestamp }) => {
         await this.session.deleteMessage(channelId, timestamp);
         return createJsonResult({ ok: true });
+      },
+    );
+  }
+
+  private registerPermissionRelay(): void {
+    const schema = z.object({
+      method: z.literal(HOOMAN_PERMISSION_REQUEST_METHOD),
+      params: z.object({
+        request_id: z.string().min(1),
+        tool_name: z.string().min(1),
+        description: z.string().min(1),
+        input_preview: z.string().min(1),
+        meta: z
+          .object({
+            source: z.string().optional(),
+            user: z.string().optional(),
+            session: z.string().optional(),
+            thread: z.string().optional(),
+          })
+          .optional(),
+      }),
+    });
+    this.mcp.server.setNotificationHandler(
+      schema,
+      async ({ params }: z.infer<typeof schema>) => {
+        const channelId = params.meta?.session?.trim();
+        if (!channelId) {
+          return;
+        }
+        const threadTs = params.meta?.thread?.trim();
+        const text = [
+          `Hooman wants to run ${params.tool_name}.`,
+          `Description: ${params.description}`,
+          `Input: ${params.input_preview}`,
+          "",
+          `Reply "yes ${params.request_id}", "always ${params.request_id}", or "no ${params.request_id}".`,
+        ].join("\n");
+        await this.session.sendMessage(channelId, text, threadTs || undefined);
       },
     );
   }

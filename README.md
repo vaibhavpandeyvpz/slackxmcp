@@ -85,10 +85,10 @@ export SLACK_APP_TOKEN="xapp-your-app-token"
 npx slackxmcp mcp
 ```
 
-3. If your MCP host supports notifications and you want inbound Slack events, provide a channel name:
+3. If your MCP host supports notifications and you want inbound Slack events, enable channels:
 
 ```bash
-npx slackxmcp mcp --channel claude/channel
+npx slackxmcp mcp --channels
 ```
 
 The server uses stdio, so it is meant to be launched by an MCP client or wrapper rather than browsed directly in a terminal.
@@ -125,12 +125,14 @@ The server currently exposes these tools:
 
 ## Push Channel
 
-When started with `--channel <name>`, the server:
+When started with `--channels`, the server:
 
-- advertises the experimental MCP capability `<name>`
-- advertises `identity/user` with path `meta.user`
-- advertises `identity/session` with path `meta.session`
-- emits `notifications/<name>` for inbound Slack message events
+- advertises the experimental MCP capability `hooman/channel`
+- advertises `hooman/user` with path `meta.user`
+- advertises `hooman/session` with path `meta.session`
+- advertises `hooman/thread` with path `meta.thread`
+- advertises `hooman/channel/permission` for remote daemon approvals
+- emits `notifications/hooman/channel` for inbound Slack message events
 
 Each notification includes:
 
@@ -138,6 +140,7 @@ Each notification includes:
 - `meta.source`: always `slack`
 - `meta.user`: the Slack sender ID when available
 - `meta.session`: the Slack conversation ID
+- `meta.thread`: the Slack thread timestamp, or the message timestamp for non-threaded messages
 
 The JSON-decoded `content` payload includes:
 
@@ -147,6 +150,8 @@ The JSON-decoded `content` payload includes:
 - `text`
 
 Inbound notification messages ignore Slack bot/system message subtypes.
+
+When Hooman sends `notifications/hooman/channel/permission_request`, `slackxmcp` posts the request back into the originating Slack conversation and waits for a reply in the same thread. Supported replies are `yes <uuid>`, `always <uuid>`, and `no <uuid>`, which are relayed back over `notifications/hooman/channel/permission`.
 
 ## License
 

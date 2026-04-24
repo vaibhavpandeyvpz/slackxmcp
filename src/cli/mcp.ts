@@ -19,11 +19,14 @@ export class McpCommand implements CliCommand {
     program
       .command("mcp")
       .description("Start the stdio MCP server for a Slack Socket Mode app")
-      .option("--channel <name>", "Channel name, for receiving notifications")
+      .option(
+        "--channels",
+        "Enable hooman/channel notifications for Slack messages",
+      )
       .action(this.action.bind(this));
   }
 
-  private async action(options: { channel?: string }): Promise<void> {
+  private async action(options: { channels?: boolean }): Promise<void> {
     let keep = false;
     const tokenConfig = resolveSlackToken();
     const appToken = process.env[APP_TOKEN_ENV_NAME]?.trim();
@@ -61,9 +64,9 @@ export class McpCommand implements CliCommand {
     });
 
     try {
-      const server = SlackMcpServer.create(session, options.channel);
+      const server = SlackMcpServer.create(session, Boolean(options.channels));
       await server.start(new StdioServerTransport());
-      if (options.channel) {
+      if (options.channels) {
         await server.subscribe();
       }
       this.io.line("Starting Slack MCP server...");
