@@ -4,11 +4,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CliIO } from "../lib/cli-io.js";
 import { SlackMcpServer } from "../lib/mcp/server.js";
 import { register } from "../lib/signal-handler.js";
+import { createEventAllowlist, loadSlackConfig } from "../lib/slack/config.js";
 import { SlackSession } from "../lib/slack/session.js";
 import type { CliCommand } from "../types.js";
-
-const TOKEN_ENV_NAMES = ["SLACK_BOT_TOKEN", "SLACK_USER_TOKEN"] as const;
-const APP_TOKEN_ENV_NAME = "SLACK_APP_TOKEN";
+import {
+  resolveSlackCredentials,
+  slackAppTokenHelpMessage,
+  slackTokenHelpMessage,
+} from "./slack-auth.js";
 
 export class McpCommand implements CliCommand {
   constructor(
@@ -28,23 +31,21 @@ export class McpCommand implements CliCommand {
 
   private async action(options: { channels?: boolean }): Promise<void> {
     let keep = false;
-    const tokenConfig = resolveSlackToken();
-    const appToken = process.env[APP_TOKEN_ENV_NAME]?.trim();
+    const config = await loadSlackConfig();
+    const credentials = resolveSlackCredentials(config);
 
-    if (!tokenConfig) {
-      throw new Error(
-        `Set ${TOKEN_ENV_NAMES.join(" or ")} before starting slackxmcp.`,
-      );
+    if (!credentials?.token) {
+      throw new Error(slackTokenHelpMessage());
     }
 
-    if (!appToken) {
-      throw new Error(`Set ${APP_TOKEN_ENV_NAME} before starting slackxmcp.`);
+    if (!credentials.appToken) {
+      throw new Error(slackAppTokenHelpMessage());
     }
 
     const session = new SlackSession({
-      token: tokenConfig.value,
-      tokenEnvName: tokenConfig.envName,
-      appToken,
+      token: credentials.token,
+      tokenEnvName: credentials.tokenEnvName,
+      appToken: credentials.appToken,
       io: this.io,
     });
 
@@ -64,7 +65,14 @@ export class McpCommand implements CliCommand {
     });
 
     try {
-      const server = SlackMcpServer.create(session, Boolean(options.channels));
+      const allowlist = options.channels
+        ? createEventAllowlist(config.allowlist)
+        : undefined;
+      const server = SlackMcpServer.create(
+        session,
+        Boolean(options.channels),
+        allowlist,
+      );
       await server.start(new StdioServerTransport());
       if (options.channels) {
         await server.subscribe();
@@ -79,17 +87,4 @@ export class McpCommand implements CliCommand {
       }
     }
   }
-}
-
-function resolveSlackToken():
-  | { envName: (typeof TOKEN_ENV_NAMES)[number]; value: string }
-  | undefined {
-  for (const envName of TOKEN_ENV_NAMES) {
-    const value = process.env[envName]?.trim();
-    if (value) {
-      return { envName, value };
-    }
-  }
-
-  return undefined;
 }

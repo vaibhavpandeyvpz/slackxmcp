@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 import { packageMetadata } from "../package-metadata.js";
+import type { SlackEventAllowlist } from "../slack/config.js";
 import { SlackChannel } from "../slack/channel.js";
 import type { SlackSession } from "../slack/session.js";
 import type { ChannelPermissionOption } from "../slack/types.js";
@@ -38,6 +39,7 @@ export class SlackMcpServer {
   private constructor(
     private readonly session: SlackSession,
     private readonly channels: boolean,
+    private readonly allowlist?: SlackEventAllowlist,
   ) {
     this.mcp = new McpServer(
       {
@@ -64,8 +66,12 @@ export class SlackMcpServer {
     }
   }
 
-  static create(session: SlackSession, channels: boolean): SlackMcpServer {
-    const server = new SlackMcpServer(session, channels);
+  static create(
+    session: SlackSession,
+    channels: boolean,
+    allowlist?: SlackEventAllowlist,
+  ): SlackMcpServer {
+    const server = new SlackMcpServer(session, channels, allowlist);
     server.registerTools();
     return server;
   }
@@ -83,6 +89,7 @@ export class SlackMcpServer {
       this.session,
       this.mcp.server,
       HOOMAN_CHANNEL,
+      this.allowlist,
     );
     await channel.start();
   }

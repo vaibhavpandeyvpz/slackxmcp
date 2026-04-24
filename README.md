@@ -9,15 +9,13 @@ It lets MCP-compatible clients interact with Slack through Web API tools and opt
 - Exposes Slack as an MCP server over stdio.
 - Uses Slack Bolt Socket Mode for inbound event delivery.
 - Uses the official Slack Web API client for reads and writes.
-- Connects using either `SLACK_BOT_TOKEN` or `SLACK_USER_TOKEN`, plus `SLACK_APP_TOKEN`.
+- Supports interactive configuration via `slackxmcp configure`.
 - Provides tools for identity, status, conversation lookups, history, thread replies, and common message mutations.
 - Can emit incoming Slack message events over an optional MCP notification channel.
 
 ## Requirements
 
 - Node.js `24+`
-- A Slack bot token exported as `SLACK_BOT_TOKEN`, or a Slack user token exported as `SLACK_USER_TOKEN`
-- A Slack app-level Socket Mode token exported as `SLACK_APP_TOKEN`
 - A Slack app with Socket Mode enabled
 
 ## Slack App Setup
@@ -65,19 +63,19 @@ npm run dev -- mcp
 
 ## Quick Start
 
-1. Export your Slack credentials:
+1. Run the interactive configuration:
 
 ```bash
-export SLACK_BOT_TOKEN="xoxb-your-bot-token"
-export SLACK_APP_TOKEN="xapp-your-app-token"
+slackxmcp configure
 ```
 
-If you prefer a user token instead:
+This writes:
 
-```bash
-export SLACK_USER_TOKEN="xoxp-your-user-token"
-export SLACK_APP_TOKEN="xapp-your-app-token"
+```text
+.slackxmcp/config.json
 ```
+
+If `./.slackxmcp` exists in the current working directory, that path is used. Otherwise, `~/.slackxmcp/config.json` is used.
 
 2. Start the MCP server:
 
@@ -102,6 +100,30 @@ npx slackxmcp mcp
 ```
 
 Starts the stdio MCP server for the configured Slack app.
+
+### Configure
+
+```bash
+npx slackxmcp configure
+```
+
+Then opens an interactive configure UI (Ink) to manage:
+
+- `App token`
+- `Bot token`
+- `User token`
+- `Allowed users`
+- `Allowed channels`
+
+Allowlist items are toggled from menu screens (select an entry to toggle it, then choose `Back`).
+
+Everything is persisted to:
+
+```text
+.slackxmcp/config.json
+```
+
+If `./.slackxmcp` exists in the current working directory, that path is used. Otherwise, `~/.slackxmcp/config.json` is used.
 
 ## MCP Tools
 
@@ -133,6 +155,13 @@ When started with `--channels`, the server:
 - advertises `hooman/thread` with path `meta.thread`
 - advertises `hooman/channel/permission` for remote daemon approvals
 - emits `notifications/hooman/channel` for inbound Slack message events
+
+If allowlist entries are configured, `notifications/hooman/channel` events are emitted only when either:
+
+- `meta.session` (conversation ID) is in `allowlist.channels`, or
+- `meta.user` (sender user ID) is in `allowlist.users`
+
+When no allowlist is configured (or both arrays are empty), all inbound channel events are emitted.
 
 Each notification includes:
 
