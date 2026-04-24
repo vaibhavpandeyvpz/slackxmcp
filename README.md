@@ -151,7 +151,9 @@ The JSON-decoded `content` payload includes:
 
 Inbound notification messages ignore Slack bot/system message subtypes.
 
-When Hooman sends `notifications/hooman/channel/permission_request`, `slackxmcp` posts the request back into the originating Slack conversation and waits for a reply in the same thread. Supported replies are `yes <uuid>`, `always <uuid>`, and `no <uuid>`, which are relayed back over `notifications/hooman/channel/permission`.
+When Hooman sends `notifications/hooman/channel/permission_request`, `slackxmcp` posts the request back into the originating Slack conversation/thread with interactive buttons derived from `params.options` (defaults: allow once, always allow, deny). Button selections are relayed back over `notifications/hooman/channel/permission`.
+
+Approvals are handled through interactive buttons rendered from the permission request options.
 
 ## License
 

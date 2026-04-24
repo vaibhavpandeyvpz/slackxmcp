@@ -69,3 +69,15 @@ export type MessageSearchResult = Message & {
   permalink?: string;
   score?: number;
 };
+
+export type ChannelPermissionBehavior = "allow_once" | "allow_always" | "deny";
+
+export type ChannelPermissionOption = {
+  id: string;
+  label: string;
+};
+
+export type PermissionDecision = {
+  requestId: string;
+  behavior: ChannelPermissionBehavior;
+};

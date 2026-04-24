@@ -1,6 +1,6 @@
 {
   "name": "slackxmcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "TypeScript stdio MCP server and CLI for Slack Socket Mode apps.",
   "type": "module",
   "bin": {

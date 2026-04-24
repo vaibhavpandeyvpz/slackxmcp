@@ -4,17 +4,21 @@ import { WebClient } from "@slack/web-api";
 import { CliIO } from "../cli-io.js";
 import type {
   Channel,
+  ChannelPermissionBehavior,
+  ChannelPermissionOption,
   Connection,
   Entity,
   Message,
   MessageSearchResult,
   MessageReference,
+  PermissionDecision,
   SlackAttachment,
   UserProfile,
 } from "./types.js";
 
 type SessionEvents = {
   message: [Message];
+  permission: [PermissionDecision];
 };
 
 type SlackUserLike = {
@@ -417,6 +421,51 @@ export class SlackSession {
     };
   }
 
+  async sendPermissionRequest(
+    channelId: string,
+    text: string,
+    requestId: string,
+    options: ChannelPermissionOption[],
+    threadTs?: string,
+  ): Promise<MessageReference> {
+    const response = await this.webClient.chat.postMessage({
+      channel: channelId,
+      text,
+      thread_ts: threadTs,
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text,
+          },
+        },
+        {
+          type: "actions",
+          elements: options.map((option) => ({
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: option.label,
+              emoji: true,
+            },
+            action_id: "hooman_approval_select",
+            value: JSON.stringify({
+              requestId,
+              optionId: option.id,
+            }),
+          })),
+        },
+      ],
+    } as never);
+
+    return {
+      channel_id: channelId,
+      ts: response.ts ?? "",
+      thread_ts: response.message?.thread_ts ?? threadTs,
+    };
+  }
+
   async sendFiles(input: {
     channelId: string;
     files: SlackUploadInput[];
@@ -516,6 +565,49 @@ export class SlackSession {
 
       app.event("message", async ({ event }) => {
         await this.handleIncomingMessage(event as SlackMessageLike);
+      });
+      app.action("hooman_approval_select", async ({ ack, body }) => {
+        await ack();
+        const payload = body as {
+          actions?: Array<{ value?: unknown }>;
+          channel?: { id?: unknown };
+          container?: { message_ts?: unknown };
+        };
+        const action = Array.isArray(payload.actions)
+          ? payload.actions[0]
+          : undefined;
+        const value =
+          typeof action?.value === "string" ? action.value : undefined;
+        const parsed = parsePermissionActionValue(value);
+        if (!parsed) {
+          return;
+        }
+        this.events.emit("permission", parsed);
+
+        const channelId =
+          typeof payload.channel?.id === "string"
+            ? payload.channel.id
+            : undefined;
+        const messageTs =
+          typeof payload.container?.message_ts === "string"
+            ? payload.container.message_ts
+            : undefined;
+        if (channelId && messageTs) {
+          await this.webClient.chat.update({
+            channel: channelId,
+            ts: messageTs,
+            text: "Approval resolved.",
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `Approval resolved: \`${parsed.behavior}\``,
+                },
+              },
+            ],
+          });
+        }
       });
 
       this.app = app;
@@ -1019,4 +1111,49 @@ export class SlackSession {
   private inferTokenEntityType(): Entity["type"] {
     return this.token.startsWith("xoxp-") ? "user" : "bot";
   }
+}
+
+function parsePermissionActionValue(
+  value: string | undefined,
+): PermissionDecision | null {
+  if (!value) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  const data = parsed as { requestId?: unknown; optionId?: unknown };
+  const requestId =
+    typeof data.requestId === "string"
+      ? data.requestId.trim().toLowerCase()
+      : "";
+  const optionId =
+    typeof data.optionId === "string" ? data.optionId.trim().toLowerCase() : "";
+  if (!requestId || !optionId) {
+    return null;
+  }
+  const behavior = toBehavior(optionId);
+  if (!behavior) {
+    return null;
+  }
+  return { requestId, behavior };
+}
+
+function toBehavior(value: string): ChannelPermissionBehavior | null {
+  if (value === "allow_once") {
+    return "allow_once";
+  }
+  if (value === "allow_always" || value === "allow-always") {
+    return "allow_always";
+  }
+  if (value === "deny") {
+    return "deny";
+  }
+  return null;
 }
