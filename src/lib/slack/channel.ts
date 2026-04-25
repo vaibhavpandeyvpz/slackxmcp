@@ -65,6 +65,7 @@ export class SlackChannel {
         method: `notifications/${this.channel}`,
         params: {
           content: JSON.stringify(event),
+          attachments: event.message.attachments,
           meta: {
             source: "slack",
             user: event.message.sender?.id,

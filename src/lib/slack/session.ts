@@ -3,6 +3,7 @@ import { App } from "@slack/bolt";
 import { WebClient } from "@slack/web-api";
 import type { KnownBlock } from "@slack/types";
 import { CliIO } from "../cli-io.js";
+import { saveSlackFile } from "../attachments.js";
 import type {
   Channel,
   ChannelPermissionBehavior,
@@ -13,7 +14,6 @@ import type {
   MessageSearchResult,
   MessageReference,
   PermissionDecision,
-  SlackAttachment,
   UserProfile,
 } from "./types.js";
 
@@ -501,9 +501,7 @@ export class SlackSession {
       ok: response.ok ?? true,
       channel_id: input.channelId,
       thread_ts: input.threadTs,
-      files: ((response.files ?? []) as SlackFileLike[]).map((file) =>
-        this.normalizeAttachment(file),
-      ),
+      files: response.files ?? [],
     };
   }
 
@@ -941,9 +939,7 @@ export class SlackSession {
       sender,
       timestamp: this.timestampFromSlackTs(message.ts),
       subtype: message.subtype,
-      attachments: (message.files ?? []).map((file) =>
-        this.normalizeAttachment(file),
-      ),
+      attachments: await this.downloadAttachments(message.files ?? []),
       links: this.extractLinks(text),
       permalink: message.permalink,
       score: message.score,
@@ -1037,9 +1033,7 @@ export class SlackSession {
         : outgoing
           ? await this.getMe()
           : undefined;
-    const attachments = (event.files ?? []).map((file) =>
-      this.normalizeAttachment(file),
-    );
+    const attachments = await this.downloadAttachments(event.files ?? []);
 
     return {
       id: `${channelId}:${event.ts ?? "unknown"}`,
@@ -1055,16 +1049,11 @@ export class SlackSession {
     };
   }
 
-  private normalizeAttachment(file: SlackFileLike): SlackAttachment {
-    return {
-      id: file.id,
-      name: file.name,
-      title: file.title,
-      mimetype: file.mimetype,
-      filetype: file.filetype,
-      size: file.size,
-      url_private_download: file.url_private_download,
-    };
+  private async downloadAttachments(files: SlackFileLike[]): Promise<string[]> {
+    const paths = await Promise.all(
+      files.map((file) => saveSlackFile(file, this.token)),
+    );
+    return paths.filter((path): path is string => Boolean(path));
   }
 
   private createUploadEntry(input: SlackUploadInput): object {

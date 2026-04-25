@@ -42,16 +42,6 @@ export type MessageReference = {
   thread_ts?: string;
 };
 
-export type SlackAttachment = {
-  id?: string;
-  name?: string;
-  title?: string;
-  mimetype?: string;
-  filetype?: string;
-  size?: number;
-  url_private_download?: string;
-};
-
 export type Message = {
   id: string;
   ts: string;
@@ -61,7 +51,7 @@ export type Message = {
   sender?: Entity;
   timestamp: string;
   subtype?: string;
-  attachments: SlackAttachment[];
+  attachments: string[];
   links: string[];
 };
 
