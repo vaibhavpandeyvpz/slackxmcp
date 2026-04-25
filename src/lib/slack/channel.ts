@@ -64,8 +64,9 @@ export class SlackChannel {
       await this.mcp.notification({
         method: `notifications/${this.channel}`,
         params: {
-          content: JSON.stringify(event),
+          content: event.text ?? "",
           attachments: event.message.attachments,
+          event,
           meta: {
             source: "slack",
             user: event.message.sender?.id,
