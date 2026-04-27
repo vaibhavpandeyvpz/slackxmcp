@@ -72,10 +72,8 @@ slackxmcp configure
 This writes:
 
 ```text
-.slackxmcp/config.json
+~/.slackxmcp/config.json
 ```
-
-If `./.slackxmcp` exists in the current working directory, that path is used. Otherwise, `~/.slackxmcp/config.json` is used.
 
 2. Start the MCP server:
 
@@ -122,10 +120,8 @@ Allowed users/channels screens support live type-to-filter search with a 5-row s
 Everything is persisted to:
 
 ```text
-.slackxmcp/config.json
+~/.slackxmcp/config.json
 ```
-
-If `./.slackxmcp` exists in the current working directory, that path is used. Otherwise, `~/.slackxmcp/config.json` is used.
 
 ## MCP Tools
 

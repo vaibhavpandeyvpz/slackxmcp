@@ -117,7 +117,7 @@ export function ConfigureApp({
       setPrompt({
         title: `Update ${label}`,
         label,
-        note: "Value is stored in .slackxmcp/config.json.",
+        note: "Value is stored in ~/.slackxmcp/config.json.",
         initialValue: draft[field],
         onSubmit: async (value) => {
           const next = value.trim();
