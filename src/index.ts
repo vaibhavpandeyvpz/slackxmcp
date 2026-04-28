@@ -1,19 +1,11 @@
-#!/usr/bin/env node
-
-import { Command } from "commander";
-import { commands } from "./cli/index.js";
-import { packageMetadata } from "./lib/package-metadata.js";
-
-const program = new Command();
-
-program
-  .name(packageMetadata.name)
-  .description(packageMetadata.description)
-  .version(packageMetadata.version)
-  .showHelpAfterError();
-
-commands.forEach((command) => {
-  command.register(program);
-});
-
-await program.parseAsync();
+export * from "./lib/attachments.js";
+export * from "./lib/cli-io.js";
+export * from "./lib/mcp/helpers.js";
+export * from "./lib/mcp/server.js";
+export * from "./lib/package-metadata.js";
+export * from "./lib/paths.js";
+export * from "./lib/signal-handler.js";
+export * from "./lib/slack/channel.js";
+export * from "./lib/slack/config.js";
+export * from "./lib/slack/session.js";
+export * from "./lib/slack/types.js";
