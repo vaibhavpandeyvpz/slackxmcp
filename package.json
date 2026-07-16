@@ -53,20 +53,20 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@slack/bolt": "^4.7.0",
-    "@slack/web-api": "^7.15.1",
+    "@slack/bolt": "^5.0.0",
+    "@slack/web-api": "^8.0.0",
     "cli-spinners": "^3.4.0",
-    "commander": "^14.0.3",
-    "ink": "^7.0.1",
+    "commander": "^15.0.0",
+    "ink": "^7.1.1",
     "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
-    "react": "^19.2.5",
-    "zod": "^4.3.6"
+    "react": "^19.2.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
   }
 }
