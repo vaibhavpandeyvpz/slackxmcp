@@ -25,9 +25,7 @@ export type PromptState = {
 };
 
 export type ConfigureScreen =
-  | { kind: "home" }
-  | { kind: "edit-users" }
-  | { kind: "edit-channels" };
+  { kind: "home" } | { kind: "edit-users" } | { kind: "edit-channels" };
 
 export type ConfigureAppProps = {
   initial: SlackConfig;

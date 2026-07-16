@@ -6,7 +6,6 @@ import { CliIO } from "../cli-io.js";
 import { saveSlackFile } from "../attachments.js";
 import type {
   Channel,
-  ChannelPermissionBehavior,
   ChannelPermissionOption,
   Connection,
   Entity,
@@ -1125,27 +1124,10 @@ function parsePermissionActionValue(
     typeof data.requestId === "string"
       ? data.requestId.trim().toLowerCase()
       : "";
-  const optionId =
-    typeof data.optionId === "string" ? data.optionId.trim().toLowerCase() : "";
-  if (!requestId || !optionId) {
-    return null;
-  }
-  const behavior = toBehavior(optionId);
-  if (!behavior) {
+  const behavior =
+    typeof data.optionId === "string" ? data.optionId.trim() : "";
+  if (!requestId || !behavior) {
     return null;
   }
   return { requestId, behavior };
-}
-
-function toBehavior(value: string): ChannelPermissionBehavior | null {
-  if (value === "allow_once") {
-    return "allow_once";
-  }
-  if (value === "allow_always" || value === "allow-always") {
-    return "allow_always";
-  }
-  if (value === "deny") {
-    return "deny";
-  }
-  return null;
 }

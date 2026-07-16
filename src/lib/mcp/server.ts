@@ -8,19 +8,12 @@ import { packageMetadata } from "../package-metadata.js";
 import type { SlackEventAllowlist } from "../slack/config.js";
 import { SlackChannel } from "../slack/channel.js";
 import type { SlackSession } from "../slack/session.js";
-import type { ChannelPermissionOption } from "../slack/types.js";
 import { createJsonResult } from "./helpers.js";
 
 const HOOMAN_CHANNEL = "hooman/channel";
 const HOOMAN_CHANNEL_PERMISSION = "hooman/channel/permission";
 const HOOMAN_PERMISSION_REQUEST_METHOD =
   "notifications/hooman/channel/permission_request";
-
-const DEFAULT_PERMISSION_OPTIONS: ChannelPermissionOption[] = [
-  { id: "allow_once", label: "Allow once" },
-  { id: "allow_always", label: "Always allow" },
-  { id: "deny", label: "Deny" },
-];
 
 function instructions(channel = false): string {
   const files = ["formatting.md", channel ? "channel.md" : null].filter(
@@ -606,14 +599,12 @@ export class SlackMcpServer {
         tool_name: z.string().min(1),
         description: z.string().min(1),
         input_preview: z.string().min(1),
-        options: z
-          .array(
-            z.object({
-              id: z.string().min(1),
-              label: z.string().min(1),
-            }),
-          )
-          .optional(),
+        options: z.array(
+          z.object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+          }),
+        ),
         meta: z
           .object({
             source: z.string().optional(),
@@ -643,34 +634,10 @@ export class SlackMcpServer {
           channelId,
           text,
           params.request_id,
-          this.resolvePermissionOptions(params.options),
+          params.options,
           threadTs || undefined,
         );
       },
     );
-  }
-
-  private resolvePermissionOptions(
-    options:
-      | Array<{
-          id: string;
-          label: string;
-        }>
-      | undefined,
-  ): ChannelPermissionOption[] {
-    const valid = (options ?? [])
-      .map((option) => ({
-        id: option.id.trim(),
-        label: option.label.trim(),
-      }))
-      .filter(
-        (option) =>
-          option.id.length > 0 &&
-          option.label.length > 0 &&
-          (option.id === "allow_once" ||
-            option.id === "allow_always" ||
-            option.id === "deny"),
-      );
-    return valid.length > 0 ? valid : DEFAULT_PERMISSION_OPTIONS;
   }
 }
