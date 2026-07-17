@@ -438,13 +438,19 @@ export class SlackSession {
       },
       {
         type: "actions",
-        elements: options.map((option) => ({
+        elements: options.map((option, i) => ({
           type: "button",
           text: {
             type: "plain_text",
             text: option.label,
             emoji: true,
           },
+          style:
+            i === 0
+              ? "primary"
+              : i === options.length - 1
+                ? "danger"
+                : undefined,
           action_id: `hooman_approval_select:${option.id}`,
           value: JSON.stringify({
             requestId,

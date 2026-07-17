@@ -624,9 +624,9 @@ export class SlackMcpServer {
         }
         const threadTs = params.meta?.thread?.trim();
         const text = [
-          `I want to run ${params.tool_name}.`,
-          `Description: ${params.description}`,
-          `Input: ${params.input_preview}`,
+          `I want to run *${params.tool_name}*.`,
+          `*Description:* ${params.description}`,
+          `*Input:* \`${params.input_preview}\``,
           "",
           "Choose an approval option using the buttons below.",
         ].join("\n");
